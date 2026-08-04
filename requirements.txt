@@ -1,0 +1,66 @@
+# Evidence-Grounded Detection of Old Videos Reposted as Recent News
+# Technology stack per Table 6.1 of the project proposal (docs/proposal.pdf)
+#
+# Version floors rather than exact pins for the fast-moving ML stack (torch, whisper,
+# open_clip, faiss) so the install resolves against whatever the current toolchain
+# actually ships; scripts/freeze_versions.sh captures an exact lockfile after a
+# successful install for reproducibility.
+
+# --- Backend / API ---
+fastapi>=0.115
+uvicorn[standard]>=0.34
+python-multipart>=0.0.20
+pydantic>=2.10
+pydantic-settings>=2.7
+
+# --- Database ---
+SQLAlchemy>=2.0.36
+psycopg2-binary>=2.9.10
+alembic>=1.14
+
+# --- Video / image processing ---
+opencv-python>=4.10
+ffmpeg-python>=0.2
+scenedetect[opencv]>=0.6.5
+Pillow>=11.0
+imagehash>=4.3
+
+# --- Speech recognition ---
+# NOTE: openai-whisper's setup.py still imports pkg_resources, which setuptools>=81
+# removed. Install it separately first with:
+#   pip install "setuptools<81" && pip install --no-build-isolation openai-whisper
+# before installing the rest of this file -- see README "Setup" section.
+openai-whisper>=20240930
+
+# --- OCR ---
+easyocr>=1.7
+
+# --- Visual embeddings / deep learning ---
+torch>=2.5
+torchvision>=0.20
+open_clip_torch>=2.29
+
+# --- Vector search ---
+faiss-cpu>=1.9
+
+# --- NLP utilities ---
+transformers>=4.47
+sentence-transformers>=3.3
+spacy>=3.8
+dateparser>=1.2
+
+# --- Data collection ---
+yt-dlp>=2024.12
+requests>=2.32
+
+# --- Utilities ---
+numpy>=1.26
+pandas>=2.2
+tqdm>=4.67
+python-dotenv>=1.0
+PyYAML>=6.0
+loguru>=0.7
+
+# --- Testing ---
+pytest>=8.3
+httpx>=0.28

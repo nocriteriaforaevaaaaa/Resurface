@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+
+# Env / secrets
+.env
+*.env.local
+
+# Dataset artefacts (large binary/media files should not be committed)
+data/raw_videos/*
+data/audio/*
+data/keyframes/*
+data/ocr_frames/*
+data/query_uploads/*
+data/faiss_index/*
+data/models/*
+!data/**/.gitkeep
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# Docker
+docker-compose.override.yml

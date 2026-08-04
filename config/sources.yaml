@@ -1,0 +1,50 @@
+# Verified Nepal news source list (Section 5.3 "Historical Dataset Construction").
+#
+# Fill this in with actual verified YouTube channels / public archives before running
+# scripts/collect_dataset.py. Only include sources with identifiable ownership and a
+# public publication record (Section 5.4 step 6) -- unverifiable channels should be
+# left out of the "is_verified" subset used for the gold evaluation data (Section 7.6).
+#
+# reliability_tier: 1 (most reliable, e.g. wire services / major national broadcasters)
+#                    .. 5 (least reliable). Feeds the metadata_score term in Eq. 5.3.
+#
+# event_categories are a hint for annotators, not an automatic label -- category and
+# location are still confirmed manually per Section 5.4 step 5.
+#
+# The three entries below were identified and verified (channel identity + upload date
+# via yt-dlp metadata) for a small seed run of the collection pipeline -- see
+# scripts/collect_seed_videos.py. Add more channels here and re-run
+# scripts/collect_dataset.py to grow the repository beyond this seed set.
+
+sources:
+  - name: "Nepal Television"
+    platform: youtube
+    homepage_url: "https://www.youtube.com/channel/UCTGVQIvtPu5kqNI5ABmN8Fw"
+    channel_url: "https://www.youtube.com/channel/UCTGVQIvtPu5kqNI5ABmN8Fw/videos"
+    reliability_tier: 1
+    is_verified: true
+    event_categories: [flood, landslide, earthquake, fire, protest, road_accident]
+
+  - name: "Nepal Times"
+    platform: youtube
+    homepage_url: "https://www.youtube.com/channel/UCHFJbvS8jzXOGeHp4Dnaz1w"
+    channel_url: "https://www.youtube.com/channel/UCHFJbvS8jzXOGeHp4Dnaz1w/videos"
+    reliability_tier: 1
+    is_verified: true
+    event_categories: [flood, landslide, earthquake, protest, political_incident]
+
+  - name: "Prime Television"
+    platform: youtube
+    homepage_url: "https://www.youtube.com/channel/UCL1Zr3XniRSwZOcqnpAKtfg"
+    channel_url: "https://www.youtube.com/channel/UCL1Zr3XniRSwZOcqnpAKtfg/videos"
+    reliability_tier: 2
+    is_verified: true
+    event_categories: [flood, landslide, road_accident, fire]
+
+  # - name: "Another Verified Outlet"
+  #   platform: youtube
+  #   homepage_url: "https://www.youtube.com/@another"
+  #   channel_url: "https://www.youtube.com/@another/videos"
+  #   reliability_tier: 2
+  #   is_verified: true
+  #   event_categories: [political_incident, public_disorder]
