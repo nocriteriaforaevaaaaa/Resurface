@@ -69,6 +69,59 @@ python scripts/run_query_pipeline.py <query_id>
 # GET /queries/<query_id>/report
 ```
 
+## Remote storage (Google Drive)
+
+Raw videos, normalised copies, audio, and keyframes are bulky and disposable (they can
+always be regenerated from the raw video, or re-downloaded from the source URL). To keep
+local disk usage small, they are archived to Google Drive and deleted from local disk
+immediately after each video finishes processing. Postgres and the FAISS index (small,
+queried on every request) always stay local.
+
+**One-time setup (interactive -- this step needs you, not me):**
+
+```bash
+rclone config
+# n) New remote
+# name> gdrive
+# Storage> drive          (search/select "Google Drive")
+# client_id> <enter>       (blank is fine)
+# client_secret> <enter>   (blank is fine)
+# scope> 1                 (full access)
+# root_folder_id> <enter>  (blank = My Drive root)
+# service_account_file> <enter>
+# Edit advanced config? n
+# Use auto config? y       (opens your browser -- log in to the Google account that
+#                            owns the 5TB Drive and grant access)
+# Configure as team drive? n
+# yes this is OK> y
+```
+
+Verify it worked:
+```bash
+rclone lsd gdrive:          # should list your Drive's top-level folders without error
+```
+
+That's it -- `settings.rclone_remote` (default `gdrive`) must match the remote name you
+picked above. Everything else is automatic:
+
+- `src/storage/remote.py::archive()` uploads a finished video's media to
+  `gdrive:EvidenceProject/<same relative path as under data/>` and deletes the local copy
+  once the upload is verified. Wired into `src/preprocessing/pipeline.py` right after a
+  video reaches `indexed` status.
+- `src/storage/remote.py::ensure_local()` transparently re-downloads a file from Drive if
+  something later needs it again (reprocessing, human review, ablation studies) --
+  wired into every low-level file-reading function (`ffmpeg_utils`, `keyframes`, `phash`,
+  `openclip_embed`, `whisper_asr`, `ocr`), so callers never need to know where a file
+  currently lives.
+- `python scripts/archive_existing.py` backfills already-processed videos that predate
+  this feature.
+- Set `USE_REMOTE_STORAGE=false` in `.env` to disable archival entirely (e.g. for local
+  development without Drive configured) -- `archive()`/`ensure_local()` become no-ops.
+
+If `rclone config` hasn't been run yet, `is_configured()` returns `False` and the pipeline
+just leaves files on local disk with a warning logged -- it never blocks or fails
+processing because Drive isn't set up.
+
 ## Project layout
 
 ```
@@ -81,6 +134,7 @@ src/
   indexing/       FAISS index management
   retrieval/      Stage 1 candidate generation + Stage 2 reranking (Eq. 5.3)
   verification/   Claim extraction (Eq. 5.4) + decision logic (Section 5.12)
+  storage/        Google Drive archival via rclone (see "Remote storage" above)
 config/
   sources.yaml    Verified news source list (fill in before collection)
 data/             Local artefact storage (videos, keyframes, audio, transcripts, OCR,

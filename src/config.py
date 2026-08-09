@@ -59,6 +59,14 @@ class Settings(BaseSettings):
     # --- Device ---
     torch_device: str = "auto"  # 'auto' resolves to mps/cuda/cpu at runtime
 
+    # --- Remote storage (Google Drive via rclone) ---
+    # Bulky media (raw video, normalised copy, audio, keyframes) is archived here and
+    # deleted locally after each video finishes processing; Postgres + the FAISS index
+    # always stay local. See src/storage/remote.py and README "Remote storage" section.
+    use_remote_storage: bool = True
+    rclone_remote: str = "gdrive"
+    rclone_remote_root: str = "EvidenceProject"
+
 
 settings = Settings()
 

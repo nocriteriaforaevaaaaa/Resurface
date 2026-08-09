@@ -6,9 +6,12 @@ from pathlib import Path
 import imagehash
 from PIL import Image
 
+from src.storage.remote import ensure_local
+
 
 def compute_phash(image_path: Path, hash_size: int = 8) -> str:
     """Returns a hex-encoded perceptual hash (64 bits for hash_size=8)."""
+    image_path = ensure_local(image_path)
     with Image.open(image_path) as img:
         return str(imagehash.phash(img, hash_size=hash_size))
 
