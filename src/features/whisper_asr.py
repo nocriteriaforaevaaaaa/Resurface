@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import TypedDict
 
 from src.config import settings
+from src.storage.remote import ensure_local
 
 
 class TranscriptSegment(TypedDict):
@@ -28,6 +29,7 @@ def _load_model():
 
 
 def transcribe(audio_path: Path) -> TranscriptResult:
+    audio_path = ensure_local(audio_path)
     model = _load_model()
     result = model.transcribe(str(audio_path))
     segments: list[TranscriptSegment] = [

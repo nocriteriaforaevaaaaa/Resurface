@@ -11,6 +11,7 @@ from pathlib import Path
 import cv2
 
 from src.config import settings
+from src.storage.remote import ensure_local
 
 MIN_SCENES = 2
 MAX_SCENES = 200
@@ -47,6 +48,7 @@ def _save_frame_at(cap: cv2.VideoCapture, timestamp_seconds: float, out_path: Pa
 
 
 def extract_keyframes(video_id: str, video_path: Path, output_dir: Path | None = None) -> list[Keyframe]:
+    video_path = ensure_local(video_path)
     output_dir = output_dir or (settings.keyframes_dir / video_id)
     output_dir.mkdir(parents=True, exist_ok=True)
 

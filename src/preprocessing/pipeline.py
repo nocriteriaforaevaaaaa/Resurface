@@ -21,6 +21,7 @@ from src.features.openclip_embed import embed_images
 from src.indexing.faiss_index import add_vectors, load_or_create_index, next_vector_id, save_index
 from src.preprocessing import ffmpeg_utils
 from src.preprocessing.keyframes import extract_keyframes
+from src.storage.remote import archive
 
 MAX_OCR_FRAMES_PER_VIDEO = 8  # Sec 5.8: OCR selected frames, not every frame
 
@@ -111,3 +112,12 @@ def process_video(video: Video, db: Session) -> None:
         db.commit()
         logger.exception(f"Failed to process video {video_id}")
         raise
+
+    # Archival is a best-effort disk-cleanup step, run only after every DB row for
+    # this video has already committed successfully -- a Drive/rclone hiccup here
+    # must never flip an already-indexed video back to 'failed'.
+    for path in (raw_path, normalised_path, audio_path, settings.keyframes_dir / video_id):
+        try:
+            archive(path)
+        except Exception:
+            logger.exception(f"Archival to remote storage failed for {path} (left on local disk)")

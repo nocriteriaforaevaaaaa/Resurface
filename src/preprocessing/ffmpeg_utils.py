@@ -5,10 +5,12 @@ import subprocess
 from pathlib import Path
 
 from src.config import settings
+from src.storage.remote import ensure_local
 
 
 def normalise_video(input_path: Path, output_path: Path, fps: int | None = None) -> Path:
     """Re-encode to a standard container/frame rate so downstream steps see uniform input."""
+    input_path = ensure_local(input_path)
     fps = fps or settings.ffmpeg_target_fps
     output_path.parent.mkdir(parents=True, exist_ok=True)
     cmd = [
@@ -24,6 +26,7 @@ def normalise_video(input_path: Path, output_path: Path, fps: int | None = None)
 
 def extract_audio(input_path: Path, output_path: Path, sample_rate: int = 16000) -> Path:
     """Extract the audio track as a mono waveform (Section 5.5 step 5) for Whisper."""
+    input_path = ensure_local(input_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     cmd = [
         "ffmpeg", "-y", "-i", str(input_path),

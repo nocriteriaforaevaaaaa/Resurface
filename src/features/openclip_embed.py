@@ -9,6 +9,7 @@ import torch
 from PIL import Image
 
 from src.config import settings
+from src.storage.remote import ensure_local
 
 
 def resolve_device(preferred: str = "auto") -> str:
@@ -37,6 +38,7 @@ def _load_model():
 def embed_images(image_paths: list[Path]) -> np.ndarray:
     """Returns an (N, D) float32 array of L2-normalised OpenCLIP embeddings."""
     model, preprocess, device = _load_model()
+    image_paths = [ensure_local(p) for p in image_paths]
     batch = torch.stack([preprocess(Image.open(p).convert("RGB")) for p in image_paths]).to(device)
     features = model.encode_image(batch)
     features = features / features.norm(dim=-1, keepdim=True)

@@ -6,6 +6,7 @@ from functools import lru_cache
 from pathlib import Path
 
 from src.config import settings
+from src.storage.remote import ensure_local
 
 
 @lru_cache(maxsize=1)
@@ -17,6 +18,7 @@ def _load_reader():
 
 def extract_text(image_path: Path) -> tuple[str, float]:
     """Returns (cleaned_text, mean_confidence) for one frame."""
+    image_path = ensure_local(image_path)
     reader = _load_reader()
     results = reader.readtext(str(image_path))
     if not results:
