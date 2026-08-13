@@ -23,13 +23,14 @@ from src.db.models import (
 from src.db.session import SessionLocal
 from src.features.openclip_embed import embed_images
 from src.features.phash import compute_phash
-from src.indexing.faiss_index import load_or_create_index
+from src.indexing.faiss_index import INDEX_PATH, load_or_create_index
 from src.preprocessing.ffmpeg_utils import extract_audio, normalise_video
 from src.preprocessing.keyframes import extract_keyframes
 from src.retrieval.candidate_retrieval import stage1_fast_candidates
 from src.retrieval.reranking import check_temporal_consistency, get_active_weights, metadata_score
 from src.features import whisper_asr
 from src.features import ocr as ocr_module
+from src.storage.remote import pull
 from src.verification.claim_extraction import extract_claim
 from src.verification.decision_logic import decide
 
@@ -57,6 +58,7 @@ def run(query_id: str) -> None:
         ocr_texts = [ocr_module.extract_text(kf.frame_path)[0] for kf in kfs[:8]]
 
         # --- Stage 1: fast candidate generation (Sec 5.10.1) ---
+        pull(INDEX_PATH)  # search against every teammate's latest indexed vectors
         index = load_or_create_index()
         candidates = stage1_fast_candidates(db, index, query_embeddings, query_phashes)
 

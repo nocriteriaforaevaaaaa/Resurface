@@ -1,8 +1,10 @@
 """Tests for src/storage/remote.py that don't require a configured rclone remote."""
-from pathlib import Path
+import subprocess
 
-from src.storage.remote import _remote_target, archive, ensure_local, is_configured
+import pytest
+
 from src.config import settings
+from src.storage.remote import _remote_target, archive, ensure_local, is_configured, pull, push
 
 
 def test_remote_target_path_mapping():
@@ -36,3 +38,29 @@ def test_ensure_local_is_noop_for_existing_file(tmp_path):
 def test_archive_is_noop_for_missing_file(tmp_path):
     missing = tmp_path / "does_not_exist.txt"
     assert archive(missing) is None
+
+
+@pytest.mark.skipif(not is_configured(), reason="rclone remote not configured on this machine")
+def test_push_then_pull_roundtrip():
+    # _remote_target requires paths under settings.data_dir, so this can't use tmp_path.
+    local = settings.data_dir / "_test_push_pull" / "sample.txt"
+    local.parent.mkdir(parents=True, exist_ok=True)
+    local.write_text("original")
+    try:
+        push(local)
+        assert local.exists()  # push, unlike archive(), must keep the local copy
+
+        local.write_text("locally modified, should be overwritten by pull")
+        pull(local)
+        assert local.read_text() == "original"
+    finally:
+        local.unlink(missing_ok=True)
+        subprocess.run(["rclone", "deletefile", _remote_target(local)], capture_output=True)
+
+
+def test_pull_is_noop_when_nothing_on_remote(tmp_path, monkeypatch):
+    monkeypatch.setattr(settings, "data_dir", tmp_path)
+    local = tmp_path / "never_pushed.txt"
+    local.write_text("stays as-is")
+    pull(local)
+    assert local.read_text() == "stays as-is"

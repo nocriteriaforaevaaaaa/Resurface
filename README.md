@@ -39,12 +39,14 @@ pip install -r requirements.txt
 # 2. Config
 cp .env.example .env      # already done for local dev; adjust as needed
 
-# 3. Database (PostgreSQL via Homebrew)
+# 3. Database (PostgreSQL via Homebrew) -- solo/local dev
 ./scripts/setup_db.sh     # creates role/db and applies src/db/schema.sql
 
 # --- OR, via Docker instead of steps 1/3 ---
 docker compose up -d db   # Postgres only
 docker compose up -d      # Postgres + API container
+
+# --- OR, for a team sharing one dataset: see "Team setup" below instead of step 3 ---
 ```
 
 ## Populating the historical repository
@@ -74,8 +76,10 @@ python scripts/run_query_pipeline.py <query_id>
 Raw videos, normalised copies, audio, and keyframes are bulky and disposable (they can
 always be regenerated from the raw video, or re-downloaded from the source URL). To keep
 local disk usage small, they are archived to Google Drive and deleted from local disk
-immediately after each video finishes processing. Postgres and the FAISS index (small,
-queried on every request) always stay local.
+immediately after each video finishes processing. Postgres always stays local (see "Team
+setup" below for sharing it across machines). The FAISS index also stays local for fast
+reads, but -- unlike media files -- it is actively read *and* written by every pipeline
+run, so it is kept in sync with Drive rather than archived-and-forgotten (see below).
 
 **One-time setup (interactive -- this step needs you, not me):**
 
@@ -122,6 +126,72 @@ If `rclone config` hasn't been run yet, `is_configured()` returns `False` and th
 just leaves files on local disk with a warning logged -- it never blocks or fails
 processing because Drive isn't set up.
 
+**FAISS index sync:** `src/storage/remote.py::pull()` downloads the latest shared index
+from Drive before a run starts (`build_repository_index.py` and `run_query_pipeline.py`
+both call it); `push()` uploads it again after new vectors are added, *without* deleting
+the local copy (unlike `archive()`). This is last-write-wins, not a real distributed
+lock -- see the caveat in `src/storage/remote.py` and "Team setup" below.
+
+## Team setup (shared dataset across multiple machines)
+
+Two things need to be shared for everyone to work against the *same* dataset, not
+diverging local copies: the Postgres database (metadata) and the FAISS index (search
+vectors, synced via Drive as described above). Media files are already shared via the
+Drive archival described above once everyone points `rclone` at the same folder.
+
+### 1. Shared Postgres (Neon)
+
+Local-only Postgres (`scripts/setup_db.sh`) is fine solo, but for a team, everyone needs
+to point at the *same* running instance instead of their own local one. Any managed
+Postgres works here (`apply_schema.sh`/`migrate_local_to_remote.sh` are host-agnostic) --
+this project uses [Neon](https://neon.tech).
+
+1. One team member creates a free project at [neon.tech](https://neon.tech) and copies
+   the connection string shown on the project dashboard ("Connection Details" /
+   "Connect" widget). It looks like:
+   ```
+   postgresql://<user>:<password>@<endpoint>.neon.tech/<dbname>?sslmode=require
+   ```
+   Neon requires `?sslmode=require` -- keep it in the string everywhere below.
+2. Apply the schema to it once:
+   ```bash
+   ./scripts/apply_schema.sh "postgresql://<user>:<password>@<endpoint>.neon.tech/<dbname>?sslmode=require"
+   ```
+3. If you already have local data worth keeping (e.g. an existing test repository),
+   migrate it once, after step 2:
+   ```bash
+   ./scripts/migrate_local_to_remote.sh "postgresql://<user>:<password>@<endpoint>.neon.tech/<dbname>?sslmode=require"
+   ```
+4. **Everyone** (including whoever created the project) sets the same value in their own
+   `.env` (never commit this -- share it over a private channel like Slack/DM, not git):
+   ```
+   DATABASE_URL=postgresql+psycopg2://<user>:<password>@<endpoint>.neon.tech/<dbname>?sslmode=require
+   ```
+
+From here, every teammate's `videos`/`decisions`/etc. rows land in the same database
+automatically -- no code changes, since the app only ever reads `DATABASE_URL`. Note
+Neon's free tier auto-suspends the compute after a few minutes idle and wakes on the
+next query (~1s cold start) -- normal, not a problem.
+
+### 2. Shared Drive folder
+
+The project owner shares the `EvidenceProject` Drive folder (Editor access) with
+teammates. Each teammate authenticates `rclone` with **their own** Google account but
+points `root_folder_id` at the *shared* folder's ID instead of their own Drive root, and
+sets `RCLONE_REMOTE_ROOT=` (empty) in their `.env` since the remote's root already *is*
+that folder. Full walkthrough: see the project's setup notes for the exact `rclone
+config` prompts, or ask whoever set up the first Drive connection.
+
+### Concurrency caveat
+
+Both the FAISS sync and Drive archival are last-write-wins, not real distributed locks.
+For a small team, the practical rule is operational: **don't run
+`scripts/collect_dataset.py` / `build_repository_index.py` at the same moment as a
+teammate.** Coordinate in chat ("running the pipeline now") before a collection run.
+If this becomes a real bottleneck later, the proper fix is moving vector search from a
+local FAISS file to Postgres itself via the `pgvector` extension (Supabase supports it
+natively) -- worth considering once the dataset and team are bigger.
+
 ## Project layout
 
 ```
@@ -139,7 +209,8 @@ config/
   sources.yaml    Verified news source list (fill in before collection)
 data/             Local artefact storage (videos, keyframes, audio, transcripts, OCR,
                   embeddings, FAISS index) -- gitignored except directory placeholders
-scripts/          CLI entry points for each pipeline stage
+scripts/          CLI entry points for each pipeline stage, incl. apply_schema.sh and
+                  migrate_local_to_remote.sh for team Postgres setup
 tests/            Smoke tests for the setup itself
 docs/proposal.pdf The source project proposal
 ```

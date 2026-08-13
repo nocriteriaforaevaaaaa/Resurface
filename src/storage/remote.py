@@ -17,6 +17,24 @@ know a file might live on Drive. Two operations bridge the gap:
                       works" without callers needing to think about where the bytes
                       currently live.
 
+Two more operations exist for the FAISS index specifically -- unlike video media, it
+isn't "process once, archive forever": every teammate's pipeline run both reads and
+appends to it, so it needs to stay in sync rather than living solely on Drive.
+
+  push(path)          Uploads but does NOT delete the local copy (archive() with
+                       delete_local=False). Called after saving the FAISS index.
+
+  pull(path)          Unconditionally overwrites the local copy with Drive's current
+                       version (unlike ensure_local(), which only fetches when the
+                       local file is missing). Called before loading the FAISS index,
+                       so a teammate always searches against everyone's latest vectors.
+
+CAVEAT: this pull-then-push pattern is last-write-wins, not a real distributed lock.
+If two teammates run the collection pipeline at the exact same time, the second push
+can silently overwrite the first's additions. For a small team, the practical fix is
+operational, not technical: don't run scripts/build_repository_index.py concurrently
+-- see README "Team setup".
+
 Requires `rclone config` to have been run once, interactively, to authorise a remote
 named settings.rclone_remote (default "gdrive") against the user's Google account --
 see README "Remote storage" for the walkthrough. That OAuth consent step cannot be
@@ -118,4 +136,35 @@ def ensure_local(local_path: Path) -> Path:
     if not local_path.exists():
         raise RemoteStorageError(f"rclone reported success but {local_path} is still missing")
     logger.info(f"Fetched from Drive: {remote} -> {local_path}")
+    return local_path
+
+
+def push(local_path: Path) -> str | None:
+    """Uploads local_path to Drive, keeping the local copy -- for shared artefacts
+    (the FAISS index) that stay in active local use, unlike archive()'s media files."""
+    return archive(local_path, delete_local=False)
+
+
+def pull(local_path: Path) -> Path:
+    """Unconditionally overwrites local_path with Drive's current copy, so a stale
+    local version can't shadow a teammate's more recent push. No-op if remote storage
+    is disabled/unconfigured, or if nothing has been pushed to Drive yet (e.g. the very
+    first run, before any teammate has a FAISS index to share)."""
+    if not settings.use_remote_storage or not is_configured():
+        return local_path
+
+    remote = _remote_target(local_path)
+    check = subprocess.run(["rclone", "lsf", remote], capture_output=True, text=True, timeout=30)
+    if check.returncode != 0 or not check.stdout.strip():
+        return local_path  # nothing on Drive yet
+
+    local_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        subprocess.run(
+            ["rclone", "copyto", remote, str(local_path)],
+            check=True, capture_output=True, text=True, timeout=1800,
+        )
+    except subprocess.CalledProcessError as exc:
+        raise RemoteStorageError(f"Failed to pull {local_path} from Drive ({remote}): {exc.stderr}") from exc
+    logger.info(f"Pulled latest from Drive: {remote} -> {local_path}")
     return local_path
