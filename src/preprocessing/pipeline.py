@@ -18,10 +18,10 @@ from src.features import ocr as ocr_module
 from src.features import phash as phash_module
 from src.features import whisper_asr
 from src.features.openclip_embed import embed_images
-from src.indexing.faiss_index import add_vectors, load_or_create_index, next_vector_id, save_index
+from src.indexing.faiss_index import INDEX_PATH, add_vectors, load_or_create_index, next_vector_id, save_index
 from src.preprocessing import ffmpeg_utils
 from src.preprocessing.keyframes import extract_keyframes
-from src.storage.remote import archive
+from src.storage.remote import archive, pull, push
 
 MAX_OCR_FRAMES_PER_VIDEO = 8  # Sec 5.8: OCR selected frames, not every frame
 
@@ -42,6 +42,7 @@ def process_video(video: Video, db: Session) -> None:
 
         # --- Keyframes + visual features (Sec 5.5, 5.6) ---
         kfs = extract_keyframes(video_id, normalised_path)
+        pull(INDEX_PATH)  # pick up any vectors a teammate has pushed since our last run
         index = load_or_create_index()
 
         if kfs:
@@ -49,6 +50,7 @@ def process_video(video: Video, db: Session) -> None:
             ids = np.array([next_vector_id(index) + i for i in range(len(kfs))])
             add_vectors(index, ids, embeddings)
             save_index(index)
+            push(INDEX_PATH)  # share our additions immediately (see remote.py caveat)
 
             for kf, vec_id in zip(kfs, ids):
                 db.add(
