@@ -52,6 +52,7 @@ dateparser>=1.2
 # --- Data collection ---
 yt-dlp>=2024.12
 requests>=2.32
+openpyxl>=3.1
 
 # --- Utilities ---
 numpy>=1.26

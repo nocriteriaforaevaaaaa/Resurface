@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     # --- Database ---
     database_url: str = "postgresql+psycopg2://evidence_user:evidence_pass@localhost:5432/evidence_db"
 
+    # --- YouTube Data API (event/channel discovery, src/ingestion) ---
+    youtube_data_api_key: str = ""
+
     # --- Storage paths ---
     data_dir: Path = DATA_DIR
     raw_videos_dir: Path = DATA_DIR / "raw_videos"
