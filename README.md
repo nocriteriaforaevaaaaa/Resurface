@@ -134,6 +134,12 @@ lock -- see the caveat in `src/storage/remote.py` and "Team setup" below.
 
 ## Team setup (shared dataset across multiple machines)
 
+**Reviewing videos as a team of three? Start with
+[`docs/TEAM_REVIEW_WORKFLOW.md`](docs/TEAM_REVIEW_WORKFLOW.md)** — a
+step-by-step guide (no Claude Code or AI assistant needed) covering how to
+split up video review, avoid duplicate work, and run the processing steps
+below without overwriting each other's results.
+
 Two things need to be shared for everyone to work against the *same* dataset, not
 diverging local copies: the Postgres database (metadata) and the FAISS index (search
 vectors, synced via Drive as described above). Media files are already shared via the
