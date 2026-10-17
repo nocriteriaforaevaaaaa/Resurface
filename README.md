@@ -140,6 +140,11 @@ step-by-step guide (no Claude Code or AI assistant needed) covering how to
 split up video review, avoid duplicate work, and run the processing steps
 below without overwriting each other's results.
 
+**Doing that processing step from Google Colab? See [`COLAB.md`](COLAB.md)** —
+per-person setup (repo clone, `.env` via Colab Secrets, `rclone` auth saved
+across sessions) plus the same one-person-at-a-time rule applied to Colab
+specifically.
+
 Two things need to be shared for everyone to work against the *same* dataset, not
 diverging local copies: the Postgres database (metadata) and the FAISS index (search
 vectors, synced via Drive as described above). Media files are already shared via the
