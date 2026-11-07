@@ -6,7 +6,7 @@ embeddings -> FAISS indexing -> audio extraction + Whisper transcript -> OCR.
 """
 from __future__ import annotations
 
-from pathlib import Path
+import re
 
 import numpy as np
 from loguru import logger
@@ -31,7 +31,9 @@ def process_video(video: Video, db: Session) -> None:
     # raw_file_path was recorded as an absolute path on whichever machine downloaded the
     # video; resolve it by file name under *this* machine's raw_videos_dir so Colab (or a
     # teammate) can process it -- ensure_local() fetches it from Drive if it isn't here.
-    raw_path = settings.raw_videos_dir / Path(video.raw_file_path).name
+    # Split on both separators: a teammate on Windows recorded paths like C:\Users\...,
+    # which Path().name would not split on macOS/Linux/Colab.
+    raw_path = settings.raw_videos_dir / re.split(r"[\\/]", video.raw_file_path)[-1]
 
     try:
         video.status = ProcessingStatus.normalising
