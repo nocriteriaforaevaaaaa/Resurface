@@ -90,7 +90,14 @@ def download_video(url: str, dest_dir: Path, max_height: int = 480) -> dict:
     dest_dir.mkdir(parents=True, exist_ok=True)
     ydl_opts = {
         "outtmpl": str(dest_dir / "%(id)s.%(ext)s"),
-        "format": f"best[height<={max_height}]/mp4/best",
+        # YouTube often serves video and audio as separate streams only; the old
+        # "best[height<=...]" selector then picked a video-only file (no transcript possible).
+        # Prefer mp4/m4a so the ffmpeg merge into mp4 always works.
+        "format": (
+            f"bv*[height<={max_height}][ext=mp4]+ba[ext=m4a]"
+            f"/bv*[height<={max_height}]+ba/b[height<={max_height}]/b"
+        ),
+        "merge_output_format": "mp4",
         "quiet": True,
         "noprogress": True,
         "writeinfojson": False,

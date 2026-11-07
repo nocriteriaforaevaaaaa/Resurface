@@ -24,6 +24,17 @@ def normalise_video(input_path: Path, output_path: Path, fps: int | None = None)
     return output_path
 
 
+def has_audio_stream(input_path: Path) -> bool:
+    """True if the file has at least one audio stream (silent clips are common in news footage)."""
+    input_path = ensure_local(input_path)
+    cmd = [
+        "ffprobe", "-v", "error", "-select_streams", "a",
+        "-show_entries", "stream=index", "-of", "csv=p=0", str(input_path),
+    ]
+    result = subprocess.run(cmd, check=True, capture_output=True, text=True)
+    return bool(result.stdout.strip())
+
+
 def extract_audio(input_path: Path, output_path: Path, sample_rate: int = 16000) -> Path:
     """Extract the audio track as a mono waveform (Section 5.5 step 5) for Whisper."""
     input_path = ensure_local(input_path)
