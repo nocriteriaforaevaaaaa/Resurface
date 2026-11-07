@@ -74,8 +74,13 @@ def process_video(video: Video, db: Session) -> None:
 
         # --- Audio transcription (Sec 5.7) ---
         audio_path = settings.audio_dir / f"{video_id}.wav"
-        ffmpeg_utils.extract_audio(normalised_path, audio_path)
-        transcript_result = whisper_asr.transcribe(audio_path)
+        if ffmpeg_utils.has_audio_stream(normalised_path):
+            ffmpeg_utils.extract_audio(normalised_path, audio_path)
+            transcript_result = whisper_asr.transcribe(audio_path)
+        else:
+            # ffmpeg exits 234 when asked to extract audio from a silent clip
+            logger.warning(f"Video {video_id} has no audio track; storing an empty transcript")
+            transcript_result = {"full_text": "", "segments": [], "language": None}
         db.add(
             Transcript(
                 video_id=video.video_id,
