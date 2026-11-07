@@ -28,7 +28,10 @@ MAX_OCR_FRAMES_PER_VIDEO = 8  # Sec 5.8: OCR selected frames, not every frame
 
 def process_video(video: Video, db: Session) -> None:
     video_id = str(video.video_id)
-    raw_path = Path(video.raw_file_path)
+    # raw_file_path was recorded as an absolute path on whichever machine downloaded the
+    # video; resolve it by file name under *this* machine's raw_videos_dir so Colab (or a
+    # teammate) can process it -- ensure_local() fetches it from Drive if it isn't here.
+    raw_path = settings.raw_videos_dir / Path(video.raw_file_path).name
 
     try:
         video.status = ProcessingStatus.normalising
