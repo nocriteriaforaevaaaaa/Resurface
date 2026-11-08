@@ -61,15 +61,65 @@ docker compose up -d      # Postgres + API container
 4. Manually review event category / location / `is_verified_subset` per Section 5.4 steps
    4-6 — these are annotation decisions, not automated.
 
-## Running a query
+## Demo web UI
+
+The FastAPI app now serves an upload-and-verify page at the root URL:
 
 ```bash
 uvicorn src.api.main:app --reload
-# POST /queries with multipart form: video=<file>, caption_text=..., post_url=...
-# then run the pipeline for that query id:
-python scripts/run_query_pipeline.py <query_id>
-# GET /queries/<query_id>/report
+# open http://localhost:8000
 ```
+
+Upload a video, add the caption it is circulating with, and press **Analyse video**.
+The page submits the file to `POST /queries` with `auto_process=true`, polls
+`GET /queries/<id>/status`, then renders the evidence report from
+`GET /queries/<id>/report`:
+
+- **Old video reposted as recent** — the closest historical match has a different
+  event category or a publication date outside the tolerance window.
+- **Recent or correctly contextualised** — the historical match is consistent with
+  the caption.
+- **Insufficient evidence** — no sufficiently reliable match; this is *not* proof
+  that the video is new.
+
+The full pipeline (normalisation, keyframes, OpenCLIP, pHash, Whisper, OCR,
+retrieval, reranking, decision) runs as a FastAPI background task. The first run is
+slow because Whisper/OpenCLIP weights are loaded; later runs reuse the cached models.
+Check `/health` for database and index status.
+
+## Running a query through the API directly
+
+```bash
+uvicorn src.api.main:app --reload
+
+# Multipart form: video=<file>, caption_text=..., post_url=...
+# By default the pipeline starts automatically in the background.
+curl -F video=@clip.mp4 -F caption_text="Flood in Kathmandu today" \
+     http://localhost:8000/queries
+
+# Use auto_process=false to create the row only and run the CLI manually:
+python scripts/run_query_pipeline.py <query_id>
+
+GET /queries/<query_id>/status    # pending -> normalising -> extracting_features -> indexed/failed
+GET /queries/<query_id>/report    # final decision + matched source
+```
+
+## Retrying a failed or interrupted build
+
+A failed repository-build row can be reset without deleting any video or Drive file:
+
+```bash
+# Dry run (default): show failed rows
+python scripts/requeue_videos.py
+
+# Reset failed and interrupted rows, then rerun the build
+python scripts/requeue_videos.py --status failed --status normalising --execute
+python scripts/build_repository_index.py
+```
+
+If you are on the shared dataset, announce that you are running the build and make
+sure no teammate is building or querying at the same time (see the concurrency caveat
+below).
 
 ## Remote storage (Google Drive)
 
@@ -213,6 +263,7 @@ src/
   preprocessing/  FFmpeg normalisation, scene detection / keyframing
   features/       pHash, OpenCLIP embeddings, Whisper ASR, OCR
   indexing/       FAISS index management
+  query/          Reusable end-to-end query pipeline shared by CLI + web UI
   retrieval/      Stage 1 candidate generation + Stage 2 reranking (Eq. 5.3)
   verification/   Claim extraction (Eq. 5.4) + decision logic (Section 5.12)
   storage/        Google Drive archival via rclone (see "Remote storage" above)
@@ -238,8 +289,13 @@ See `src/db/schema.sql` for the canonical DDL (12 tables: `sources`, `videos`,
 - `config/sources.yaml` ships with a placeholder entry only -- real verified Nepali news
   channels must be added by the team before running data collection (Section 8.4: only
   publicly accessible, attributable sources).
-- Transcript/OCR similarity scoring in `scripts/run_query_pipeline.py` is stubbed at 0.0
-  pending a TF-IDF or multilingual sentence-embedding implementation (Section 5.7).
+- Transcript/OCR similarity uses a deterministic lexical-overlap scorer
+  (`src/retrieval/text_similarity.py`), not a multilingual sentence-embedding model.
+  It is fast and dependency-free, but paraphrases and cross-language matches can be
+  under-scored. Replace `text_similarity()` with an embedding scorer when available.
+- `videos.evidence_quality_score` is an optional manual annotation. When it is NULL,
+  `decision_logic.effective_evidence_quality()` falls back to source-reliability tier
+  with a conservative floor for the manually verified subset.
 - No Nepali-specific NER model is wired in yet; `claim_extraction.py` uses rule-based
   keyword/regex extraction as an interim per Table 6.1 ("spaCy or rule-based extraction").
 - `reranking_weight_sets` starts at an even default (0.4/0.2/0.2/0.1/0.1); Section 7.5's

@@ -1,0 +1,730 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Resurface — Old Video Detector</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #070b16;
+      --bg-2: #0d1425;
+      --card: rgba(18, 27, 48, 0.78);
+      --card-strong: rgba(23, 35, 62, 0.94);
+      --border: rgba(148, 163, 184, 0.18);
+      --text: #e8eefc;
+      --muted: #9aa8c4;
+      --accent: #7c9cff;
+      --accent-2: #59e1c1;
+      --danger: #ff6b81;
+      --warning: #ffc857;
+      --success: #4ade80;
+      --shadow: 0 24px 70px rgba(0, 0, 0, 0.35);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(900px 600px at 12% -8%, rgba(124, 156, 255, 0.22), transparent 60%),
+        radial-gradient(780px 540px at 92% 0%, rgba(89, 225, 193, 0.14), transparent 55%),
+        linear-gradient(180deg, var(--bg), var(--bg-2) 55%, #070b16);
+      padding: 40px 18px 60px;
+    }
+
+    .shell { width: min(980px, 100%); margin: 0 auto; }
+
+    header { margin-bottom: 28px; }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--accent-2);
+      font-weight: 700;
+    }
+
+    .eyebrow::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent-2);
+      box-shadow: 0 0 18px rgba(89, 225, 193, 0.9);
+    }
+
+    h1 {
+      margin: 12px 0 10px;
+      font-size: clamp(30px, 6vw, 52px);
+      line-height: 1.04;
+      letter-spacing: -0.035em;
+    }
+
+    .lede {
+      margin: 0;
+      max-width: 720px;
+      color: var(--muted);
+      line-height: 1.65;
+      font-size: 16px;
+    }
+
+    .topline {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 18px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 12px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.035);
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .pill strong { color: var(--text); font-weight: 650; }
+
+    .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--success);
+      box-shadow: 0 0 12px rgba(74, 222, 128, 0.8);
+    }
+
+    .dot.offline {
+      background: var(--danger);
+      box-shadow: 0 0 12px rgba(255, 107, 129, 0.8);
+    }
+
+    .panel {
+      border: 1px solid var(--border);
+      background: linear-gradient(180deg, rgba(23, 35, 62, 0.86), rgba(13, 20, 37, 0.9));
+      border-radius: 24px;
+      padding: 22px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(18px);
+    }
+
+    form { display: grid; gap: 16px; }
+
+    .dropzone {
+      position: relative;
+      display: grid;
+      place-items: center;
+      gap: 7px;
+      min-height: 180px;
+      padding: 28px;
+      border: 1.5px dashed rgba(148, 163, 184, 0.34);
+      border-radius: 18px;
+      background:
+        radial-gradient(420px 160px at 50% 0%, rgba(124, 156, 255, 0.14), transparent 70%),
+        rgba(7, 11, 22, 0.35);
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
+    }
+
+    .dropzone:hover, .dropzone.dragover {
+      border-color: rgba(124, 156, 255, 0.8);
+      background: rgba(124, 156, 255, 0.08);
+    }
+
+    .dropzone.dragover { transform: translateY(-1px); }
+
+    .drop-icon {
+      display: grid;
+      place-items: center;
+      width: 46px;
+      height: 46px;
+      border-radius: 14px;
+      background: linear-gradient(135deg, rgba(124, 156, 255, 0.2), rgba(89, 225, 193, 0.16));
+      border: 1px solid rgba(124, 156, 255, 0.25);
+      font-size: 22px;
+    }
+
+    .dropzone strong { font-size: 17px; }
+    .dropzone .muted { font-size: 13px; }
+
+    .field { display: grid; gap: 8px; }
+
+    .field > span {
+      font-size: 13px;
+      font-weight: 650;
+      color: #c7d2ea;
+    }
+
+    textarea {
+      width: 100%;
+      resize: vertical;
+      min-height: 92px;
+      padding: 14px 15px;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      background: rgba(7, 11, 22, 0.55);
+      color: var(--text);
+      font: inherit;
+      line-height: 1.5;
+      outline: none;
+      transition: border-color 160ms ease, box-shadow 160ms ease;
+    }
+
+    textarea:focus {
+      border-color: rgba(124, 156, 255, 0.65);
+      box-shadow: 0 0 0 4px rgba(124, 156, 255, 0.12);
+    }
+
+    .actions { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+
+    button {
+      appearance: none;
+      border: 0;
+      border-radius: 14px;
+      padding: 14px 20px;
+      font: inherit;
+      font-weight: 750;
+      color: #07101f;
+      background: linear-gradient(135deg, #9fb6ff, #59e1c1);
+      cursor: pointer;
+      box-shadow: 0 12px 30px rgba(89, 225, 193, 0.18);
+      transition: transform 140ms ease, filter 140ms ease, opacity 140ms ease;
+    }
+
+    button:hover:not(:disabled) { transform: translateY(-1px); filter: brightness(1.04); }
+    button:disabled { opacity: 0.45; cursor: not-allowed; box-shadow: none; }
+
+    .ghost {
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--border);
+      box-shadow: none;
+    }
+
+    .muted { color: var(--muted); }
+    .hidden { display: none !important; }
+
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-top: 18px;
+      padding: 16px;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: rgba(7, 11, 22, 0.45);
+    }
+
+    .spinner {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      border: 2.5px solid rgba(124, 156, 255, 0.22);
+      border-top-color: var(--accent);
+      animation: spin 0.9s linear infinite;
+      flex: 0 0 auto;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .status.error { border-color: rgba(255, 107, 129, 0.4); background: rgba(255, 107, 129, 0.07); }
+    .status.error .spinner { display: none; }
+
+    .result {
+      margin-top: 22px;
+      border-radius: 24px;
+      border: 1px solid var(--border);
+      background: var(--card);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      animation: rise 260ms ease both;
+    }
+
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .result-head {
+      padding: 22px 22px 18px;
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(135deg, rgba(124, 156, 255, 0.12), rgba(89, 225, 193, 0.07));
+    }
+
+    .result.fake .result-head { background: linear-gradient(135deg, rgba(255, 107, 129, 0.18), rgba(255, 200, 87, 0.07)); }
+    .result.real .result-head { background: linear-gradient(135deg, rgba(74, 222, 128, 0.16), rgba(89, 225, 193, 0.06)); }
+    .result.unknown .result-head { background: linear-gradient(135deg, rgba(255, 200, 87, 0.16), rgba(148, 163, 184, 0.07)); }
+
+    .result-kicker {
+      font-size: 12px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      font-weight: 800;
+      color: var(--accent);
+    }
+
+    .result.fake .result-kicker { color: var(--danger); }
+    .result.real .result-kicker { color: var(--success); }
+    .result.unknown .result-kicker { color: var(--warning); }
+
+    .result h2 { margin: 8px 0 6px; font-size: clamp(24px, 4vw, 34px); letter-spacing: -0.025em; }
+    .result-sub { margin: 0; color: var(--muted); line-height: 1.55; }
+
+    .result-body { padding: 20px 22px 24px; display: grid; gap: 18px; }
+
+    .confidence { display: grid; gap: 8px; }
+    .confidence-row { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; color: var(--muted); }
+    .confidence-row strong { color: var(--text); font-size: 15px; }
+
+    .bar {
+      height: 9px;
+      border-radius: 999px;
+      background: rgba(148, 163, 184, 0.16);
+      overflow: hidden;
+    }
+
+    .bar > i {
+      display: block;
+      height: 100%;
+      width: 0;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--accent), var(--accent-2));
+      transition: width 500ms ease;
+    }
+
+    .result.fake .bar > i { background: linear-gradient(90deg, var(--danger), var(--warning)); }
+    .result.real .bar > i { background: linear-gradient(90deg, var(--success), var(--accent-2)); }
+    .result.unknown .bar > i { background: linear-gradient(90deg, var(--warning), #fb923c); }
+
+    .evidence-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .evidence {
+      padding: 14px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: rgba(7, 11, 22, 0.35);
+      min-width: 0;
+    }
+
+    .evidence span {
+      display: block;
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 7px;
+    }
+
+    .evidence strong, .evidence a {
+      display: block;
+      font-size: 14px;
+      line-height: 1.4;
+      color: var(--text);
+      text-decoration: none;
+      overflow-wrap: anywhere;
+    }
+
+    .evidence a:hover { color: var(--accent-2); text-decoration: underline; }
+
+    .explanation {
+      padding: 15px 16px;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      background: rgba(7, 11, 22, 0.32);
+      color: #c9d4ea;
+      line-height: 1.65;
+      font-size: 14px;
+    }
+
+    .warnings {
+      margin: 0;
+      padding: 0 0 0 18px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .notes {
+      margin-top: 24px;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .note {
+      padding: 16px;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.025);
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .note strong { display: block; color: var(--text); margin-bottom: 5px; }
+
+    footer {
+      margin-top: 28px;
+      color: #7483a2;
+      font-size: 12px;
+      line-height: 1.6;
+      text-align: center;
+    }
+
+    @media (max-width: 720px) {
+      body { padding: 26px 14px 48px; }
+      .panel { padding: 16px; border-radius: 20px; }
+      .evidence-grid, .notes { grid-template-columns: 1fr; }
+      .dropzone { min-height: 150px; padding: 22px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header>
+      <div class="eyebrow">Resurface · Evidence-grounded verification</div>
+      <h1>Is this video old news reposted as new?</h1>
+      <p class="lede">
+        Upload a video and the caption it is circulating with. Resurface searches a
+        three-year archive of Nepali news footage using visual, perceptual-hash, audio,
+        OCR, and metadata evidence — then returns a decision with the historical match.
+      </p>
+      <div class="topline">
+        <div class="pill"><span id="health-dot" class="dot"></span><span id="health-text">Checking repository…</span></div>
+        <div class="pill">Indexed keyframes: <strong id="index-size">—</strong></div>
+        <div class="pill">Prototype · not a substitute for editorial verification</div>
+      </div>
+    </header>
+
+    <section class="panel">
+      <form id="form">
+        <label class="dropzone" id="dropzone">
+          <input id="video" type="file" accept="video/*" hidden>
+          <span class="drop-icon">↑</span>
+          <strong>Choose a video or drag it here</strong>
+          <span class="muted" id="filename">MP4, MOV, or WebM · short clips are faster</span>
+        </label>
+
+        <label class="field">
+          <span>Caption or claim circulating with the video</span>
+          <textarea id="caption" rows="3" placeholder="Example: Flood in Kathmandu today, please share…"></textarea>
+        </label>
+
+        <div class="actions">
+          <button id="submit" type="submit" disabled>Analyse video</button>
+          <span class="muted" id="hint">The analysis can take a few minutes on CPU.</span>
+        </div>
+      </form>
+
+      <div id="status" class="status hidden" role="status" aria-live="polite">
+        <div class="spinner"></div>
+        <div>
+          <div id="status-title">Uploading…</div>
+          <div id="status-detail" class="muted"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="result" class="result hidden" aria-live="polite">
+      <div class="result-head">
+        <div class="result-kicker" id="result-kicker">Decision</div>
+        <h2 id="result-title">—</h2>
+        <p class="result-sub" id="result-sub">—</p>
+      </div>
+      <div class="result-body">
+        <div class="confidence">
+          <div class="confidence-row"><span>Match confidence</span><strong id="confidence">—</strong></div>
+          <div class="bar"><i id="confidence-bar"></i></div>
+        </div>
+
+        <div class="evidence-grid">
+          <div class="evidence"><span>Matched source</span><strong id="source-name">—</strong></div>
+          <div class="evidence"><span>Published</span><strong id="published">—</strong></div>
+          <div class="evidence"><span>Historical video</span><a id="source-link" target="_blank" rel="noreferrer">—</a></div>
+        </div>
+
+        <div class="explanation" id="explanation">—</div>
+        <ul class="warnings hidden" id="warnings"></ul>
+
+        <div class="actions">
+          <button type="button" class="ghost" id="again">Analyse another video</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="notes">
+      <div class="note"><strong>What “old / reposted” means</strong>The footage appears in the archive under a different, older context. That is evidence of misleading reuse, not proof about the original uploader’s intent.</div>
+      <div class="note"><strong>What “insufficient evidence” means</strong>No confident archive match was found. The video may be new, or simply not covered by the current repository. It is not automatically “real”.</div>
+      <div class="note"><strong>How the score works</strong>Visual, pHash, transcript, OCR, and source-reliability signals are combined. A low-tier re-upload source lowers metadata confidence but does not erase a strong visual match.</div>
+    </section>
+
+    <footer>
+      Resurface · BE Major Project, Pulchowk Campus · Decisions are evidence-backed estimates,
+      not definitive fact-checks.
+    </footer>
+  </main>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const form = $("form");
+    const fileInput = $("video");
+    const dropzone = $("dropzone");
+    const filename = $("filename");
+    const submitBtn = $("submit");
+    const statusBox = $("status");
+    const statusTitle = $("status-title");
+    const statusDetail = $("status-detail");
+    const resultBox = $("result");
+    let selectedFile = null;
+    let pollTimer = null;
+    let startedAt = null;
+
+    const STATUS_TEXT = {
+      pending: "Queued for processing",
+      downloading: "Fetching the uploaded video",
+      normalising: "Normalising video",
+      extracting_features: "Extracting visual, audio, and text evidence",
+      indexed: "Decision ready",
+      failed: "Processing failed",
+      excluded: "Excluded",
+    };
+
+    const DECISIONS = {
+      old_video_reposted_as_recent: {
+        cls: "fake",
+        kicker: "Likely misleading",
+        title: "Old video reposted as recent",
+        sub: "The footage appears in the historical archive under a different, older context.",
+      },
+      recent_or_correctly_contextualised: {
+        cls: "real",
+        kicker: "Likely authentic / current",
+        title: "No conflicting older context found",
+        sub: "The closest historical match is consistent with the caption and publication context.",
+      },
+      insufficient_evidence: {
+        cls: "unknown",
+        kicker: "Cannot verify",
+        title: "Insufficient evidence",
+        sub: "No confident archive match was found. This does not prove the video is new.",
+      },
+    };
+
+    function setFile(file) {
+      selectedFile = file || null;
+      submitBtn.disabled = !selectedFile;
+      if (selectedFile) {
+        const mb = (selectedFile.size / (1024 * 1024)).toFixed(1);
+        filename.textContent = `${selectedFile.name} · ${mb} MB`;
+      } else {
+        filename.textContent = "MP4, MOV, or WebM · short clips are faster";
+      }
+    }
+
+    fileInput.addEventListener("change", () => setFile(fileInput.files[0]));
+
+    ["dragenter", "dragover"].forEach((event) => {
+      dropzone.addEventListener(event, (e) => {
+        e.preventDefault();
+        dropzone.classList.add("dragover");
+      });
+    });
+
+    ["dragleave", "drop"].forEach((event) => {
+      dropzone.addEventListener(event, (e) => {
+        e.preventDefault();
+        dropzone.classList.remove("dragover");
+      });
+    });
+
+    dropzone.addEventListener("drop", (e) => {
+      const file = e.dataTransfer.files[0];
+      if (file) {
+        fileInput.files = e.dataTransfer.files;
+        setFile(file);
+      }
+    });
+
+    function showStatus(title, detail, isError = false) {
+      statusBox.classList.remove("hidden");
+      statusBox.classList.toggle("error", isError);
+      statusTitle.textContent = title;
+      statusDetail.textContent = detail || "";
+    }
+
+    function hideStatus() {
+      statusBox.classList.add("hidden");
+    }
+
+    function resetResult() {
+      resultBox.classList.add("hidden");
+      resultBox.className = "result hidden";
+    }
+
+    function formatDate(value) {
+      if (!value) return "—";
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return value;
+      return date.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+    }
+
+    function renderReport(report) {
+      const config = DECISIONS[report.label] || DECISIONS.insufficient_evidence;
+      resultBox.className = `result ${config.cls}`;
+      $("result-kicker").textContent = config.kicker;
+      $("result-title").textContent = config.title;
+      $("result-sub").textContent = config.sub;
+
+      const confidence = Math.round((report.confidence_score || 0) * 100);
+      $("confidence").textContent = `${confidence}%`;
+      $("confidence-bar").style.width = `${Math.max(2, confidence)}%`;
+
+      $("source-name").textContent = report.matched_source_name || "No historical match";
+      $("published").textContent = formatDate(report.matched_publication_date);
+
+      const link = $("source-link");
+      if (report.matched_source_url) {
+        link.href = report.matched_source_url;
+        link.textContent = report.matched_title || "Open source video";
+        link.classList.remove("hidden");
+      } else {
+        link.removeAttribute("href");
+        link.textContent = "—";
+      }
+
+      $("explanation").textContent = report.explanation || "No explanation available.";
+
+      const warnings = $("warnings");
+      warnings.innerHTML = "";
+      if (Array.isArray(report.warnings) && report.warnings.length) {
+        report.warnings.forEach((warning) => {
+          const li = document.createElement("li");
+          li.textContent = warning;
+          warnings.appendChild(li);
+        });
+        warnings.classList.remove("hidden");
+      } else {
+        warnings.classList.add("hidden");
+      }
+
+      resultBox.classList.remove("hidden");
+      hideStatus();
+      resultBox.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    function showFailure(message) {
+      showStatus("Analysis failed", message, true);
+    }
+
+    async function fetchReport(queryId) {
+      const response = await fetch(`/queries/${queryId}/report`);
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body.detail || `Report request failed (${response.status})`);
+      }
+      return response.json();
+    }
+
+    async function poll(queryId) {
+      try {
+        const response = await fetch(`/queries/${queryId}/status`);
+        if (!response.ok) {
+          const body = await response.json().catch(() => ({}));
+          throw new Error(body.detail || `Status request failed (${response.status})`);
+        }
+        const data = await response.json();
+        const elapsed = Math.round((Date.now() - startedAt) / 1000);
+        const label = STATUS_TEXT[data.status] || data.status;
+
+        if (data.status === "indexed") {
+          showStatus("Decision ready", "Loading the evidence report…");
+          const report = await fetchReport(queryId);
+          renderReport(report);
+          return;
+        }
+
+        if (data.status === "failed") {
+          showFailure("The pipeline could not finish this video. Check the server logs for the exact error.");
+          return;
+        }
+
+        showStatus(label, `${elapsed}s elapsed · this can take a few minutes on CPU.`);
+        pollTimer = setTimeout(() => poll(queryId), 1800);
+      } catch (error) {
+        showFailure(error.message);
+      }
+    }
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      if (!selectedFile) return;
+
+      clearTimeout(pollTimer);
+      resetResult();
+      submitBtn.disabled = true;
+      startedAt = Date.now();
+      showStatus("Uploading…", "Sending the video to the analysis service.");
+
+      const formData = new FormData();
+      formData.append("video", selectedFile, selectedFile.name);
+      formData.append("caption_text", $("caption").value || "");
+      formData.append("auto_process", "true");
+
+      try {
+        const response = await fetch("/queries", { method: "POST", body: formData });
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(body.detail || `Upload failed (${response.status})`);
+        }
+
+        showStatus("Queued", "The video is being processed.");
+        poll(body.query_id);
+      } catch (error) {
+        showFailure(error.message);
+        submitBtn.disabled = false;
+      }
+    });
+
+    $("again").addEventListener("click", () => {
+      clearTimeout(pollTimer);
+      fileInput.value = "";
+      setFile(null);
+      $("caption").value = "";
+      resetResult();
+      hideStatus();
+      submitBtn.disabled = true;
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+
+    async function loadHealth() {
+      try {
+        const response = await fetch("/health");
+        const data = await response.json();
+        $("health-text").textContent = data.database === "ok" ? "Repository online" : "Database issue";
+        $("health-dot").classList.toggle("offline", data.database !== "ok");
+        $("index-size").textContent = Number(data.faiss_index_size || 0).toLocaleString();
+      } catch {
+        $("health-text").textContent = "Repository offline";
+        $("health-dot").classList.add("offline");
+      }
+    }
+
+    loadHealth();
+  </script>
+</body>
+</html>

@@ -10,7 +10,8 @@ from src.storage.remote import _remote_target, archive, ensure_local, is_configu
 def test_remote_target_path_mapping():
     local = settings.data_dir / "raw_videos" / "abc123.mp4"
     remote = _remote_target(local)
-    assert remote == f"{settings.rclone_remote}:{settings.rclone_remote_root}/raw_videos/abc123.mp4"
+    root_prefix = f"{settings.rclone_remote_root}/" if settings.rclone_remote_root else ""
+    assert remote == f"{settings.rclone_remote}:{root_prefix}raw_videos/abc123.mp4"
 
 
 def test_remote_target_path_mapping_with_empty_root(monkeypatch):
