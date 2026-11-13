@@ -198,6 +198,59 @@ class QueryPost(Base):
         back_populates="query", cascade="all, delete-orphan"
     )
     decision: Mapped["Decision | None"] = relationship(back_populates="query", cascade="all, delete-orphan")
+    keyframes: Mapped[list["QueryKeyframe"]] = relationship(
+        back_populates="query", cascade="all, delete-orphan"
+    )
+    transcript: Mapped["QueryTranscript | None"] = relationship(
+        back_populates="query", cascade="all, delete-orphan"
+    )
+    ocr_results: Mapped[list["QueryOcrResult"]] = relationship(
+        back_populates="query", cascade="all, delete-orphan"
+    )
+
+
+class QueryKeyframe(Base):
+    __tablename__ = "query_keyframes"
+
+    query_keyframe_id: Mapped[uuid.UUID] = _uuid_pk()
+    query_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("query_posts.query_id", ondelete="CASCADE")
+    )
+    frame_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    timestamp_seconds: Mapped[float] = mapped_column(Numeric(10, 3), nullable=False)
+    frame_path: Mapped[str] = mapped_column(Text, nullable=False)
+    phash: Mapped[str | None] = mapped_column(String(16))
+
+    query: Mapped["QueryPost"] = relationship(back_populates="keyframes")
+
+    __table_args__ = (UniqueConstraint("query_id", "frame_index"),)
+
+
+class QueryTranscript(Base):
+    __tablename__ = "query_transcripts"
+
+    query_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("query_posts.query_id", ondelete="CASCADE"), primary_key=True
+    )
+    full_text: Mapped[str | None] = mapped_column(Text)
+    segments: Mapped[list | None] = mapped_column(JSONB)
+    language: Mapped[str | None] = mapped_column(Text)
+    asr_model: Mapped[str | None] = mapped_column(Text)
+
+    query: Mapped["QueryPost"] = relationship(back_populates="transcript")
+
+
+class QueryOcrResult(Base):
+    __tablename__ = "query_ocr_results"
+
+    query_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("query_posts.query_id", ondelete="CASCADE"), primary_key=True
+    )
+    frame_index: Mapped[int] = mapped_column(Integer, primary_key=True)
+    raw_text: Mapped[str | None] = mapped_column(Text)
+    cleaned_text: Mapped[str | None] = mapped_column(Text)
+
+    query: Mapped["QueryPost"] = relationship(back_populates="ocr_results")
 
 
 class RetrievalCandidate(Base):
